@@ -1,0 +1,9 @@
+public enum Day {
+    ERROR,
+    MAIN_MENU,
+    ADDING_BOOK,
+    SEARCHING_MENU,
+    SEARCH_RESULTS,
+    UPDATE_OPTIONS,
+    DELETE_MENU
+}
