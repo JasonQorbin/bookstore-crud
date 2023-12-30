@@ -1,5 +1,5 @@
 import java.sql.*;
-
+             
 public class BookstoreProgram {
     //Database parameters
     private static final String DATABASE_NAME = "ebookstore";

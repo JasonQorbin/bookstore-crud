@@ -1,1 +1,1 @@
-javac *.java -d out
+javac .\src\*.java -d out
