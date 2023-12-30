@@ -133,7 +133,7 @@ public class BookTable {
      * @returns true if the database changed
      *
      */
-    public static boolean insertBook(Connection connection, String title, String author, int qty) throws SQLException{
+    public static boolean insertBook(Connection connection, String title, String author, int qty) throws SQLException {
         StringBuilder queryBuilder = new StringBuilder();
         queryBuilder.append("INSERT INTO ").append(NAME).append(" (")
                 .append(COLUMN_TITLE).append(", ")
@@ -170,7 +170,7 @@ public class BookTable {
         return  insertInitialData(connection);
     }
 
-    public static boolean deleteBook(Connection connection, int idToDelete) throws SQLPermission {
+    public static boolean deleteBook(Connection connection, int idToDelete) throws SQLException {
         StringBuilder queryBuilder = new StringBuilder();
         queryBuilder.append("DELETE FROM ").append(NAME)
             .append(" WHERE ").append(COLUMN_ID).append(" = ")
@@ -179,7 +179,7 @@ public class BookTable {
         return statement.executeUpdate(queryBuilder.toString()) > 0;
     }
 
-    public static boolean updateTitle(Connection connection, int idToChange,String newTitle) {
+    public static boolean updateTitle(Connection connection, int idToChange,String newTitle) throws SQLException{
         StringBuilder queryBuilder = new StringBuilder();
         queryBuilder.append("UPDATE ").append(NAME).append(" SET ").append(COLUMN_TITLE)
                     .append(" = ? WHERE ").append(COLUMN_ID).append(" = ?;");
@@ -189,7 +189,7 @@ public class BookTable {
         return statement.executeUpdate() >0;
     }
 
-    public static boolean updateAuthor(Connection connection, int idToChange,String newAuthor) {
+    public static boolean updateAuthor(Connection connection, int idToChange,String newAuthor) throws SQLException{
         StringBuilder queryBuilder = new StringBuilder();
         queryBuilder.append("UPDATE ").append(NAME).append(" SET ").append(COLUMN_AUTHOR)
                     .append(" = ? WHERE ").append(COLUMN_ID).append(" = ?;");
@@ -199,7 +199,7 @@ public class BookTable {
         return statement.executeUpdate() >0;
     }
 
-    public static boolean updateQty(Connection connection, int idToChange, int newQty) {
+    public static boolean updateQty(Connection connection, int idToChange, int newQty) throws SQLException{
         StringBuilder queryBuilder = new StringBuilder();
         queryBuilder.append("UPDATE ").append(NAME).append(" SET ").append(COLUMN_QTY)
                     .append(" = ? WHERE ").append(COLUMN_ID).append(" = ?;");

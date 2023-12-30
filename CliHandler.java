@@ -1,6 +1,8 @@
 import java.util.Scanner;
-
-import javax.sql.rowset.Predicate;
+import java.util.function.Predicate;
+import java.util.InputMismatchException;
+import java.util.NoSuchElementException;
+import java.io.IOException;
 
 class CliHandler {
     Scanner consoleReader;
@@ -33,13 +35,16 @@ class CliHandler {
         System.out.println("Selected book: "
             + selectedBook.title + " by " + selectedBook.author + " (" + selectedBook.qty + ")");
         boolean haveValidInput = false;
+        int input = -1;
         while (!haveValidInput) {
             try {
                 System.out.print("Menu choice: ");
-                int input = consoleReader.nextInt();
-            } catch (InputMismatchException | NoSuchElementException exc) {
-                //Either nothing was typed in or the input was not an integer.
-                //Go back to the start of the loop and try getting input again.
+                input = consoleReader.nextInt();
+            } catch (InputMismatchException exc) {
+                //The input received isn't an integer
+                continue;
+            } catch (NoSuchElementException exc) {
+                //No input found.
                 continue;
             }
 
@@ -64,16 +69,17 @@ class CliHandler {
             """
         );
         System.out.println();
-        System.out.println("Selected book: "
-            + selectedBook.title + " by " + selectedBook.author + " (" + selectedBook.qty + ")");
         boolean haveValidInput = false;
+        int input = -1;
         while (!haveValidInput) {
             try {
                 System.out.print("Menu choice: ");
-                int input = consoleReader.nextInt();
-            } catch (InputMismatchException | NoSuchElementException exc) {
-                //Either nothing was typed in or the input was not an integer.
-                //Go back to the start of the loop and try getting input again.
+                input = consoleReader.nextInt();
+            } catch (InputMismatchException exc) {
+                //The input received doesn't appear to be an integer
+                continue;
+            } catch (NoSuchElementException exc) {
+                //No input received
                 continue;
             }
 
@@ -89,10 +95,7 @@ class CliHandler {
     }
 
     public Book getBookInfoFromUser() {
-        Book book;
-        String title;
-        String author;
-        int qty;
+        Book book = new Book();
         
         book.title =  getString("Book title: ", new BookTitlePredicate());
         book.author = getString("Book author: ", new BookAuthorPredicate());
@@ -116,24 +119,23 @@ class CliHandler {
     }
 
     private int getInt(String prompt, Predicate<Integer> predicate) { 
+        int number = 0;
         while (true) {
             System.out.print(prompt);
             try {    
-                qty = consoleReader.nextInt();
+                number = consoleReader.nextInt();
             } catch (InputMismatchException inputEx) {
                 System.out.println("The amount entered should be an integer.");
                 continue;
             }
-
+            if (predicate.test(number)) {
+                break;
+            }
         }
+        return number;
     }
 
-    @Override
-    protected void finalize() {
-        try {
-            consoleReader.close();
-        } catch (IOException exc) {
-            System.out.println("Problem closing terminal scanner.");
-        }
+    public void cleanup() {
+        consoleReader.close();
     }
 }

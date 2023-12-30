@@ -1,7 +1,5 @@
 import java.sql.*;
 
-import sun.awt.www.content.audio.wav;
-
 public class BookstoreProgram {
     //Database parameters
     private static final String DATABASE_NAME = "ebookstore";
@@ -9,9 +7,20 @@ public class BookstoreProgram {
     private static final String DATABASE_VENDOR = "mysql";
     private static final String DATABASE_HOST = "localhost";
     private static final String DATABASE_PORT = "3306";
-    private static final String DATABASE_USER = "AppUser";
-    private static final String DATABASE_PASSWORD = "AIPASS";
+    private static final String DATABASE_USER = "Jason";
+    private static final String DATABASE_PASSWORD = "KochiraDozo";
     
+    private enum ProgramState {
+        ERROR,
+        MAIN_MENU,
+        ADDING_BOOK,
+        SEARCHING_MENU,
+        SEARCH_RESULTS,
+        UPDATE_OPTIONS,
+        DELETE_MENU,
+        EXIT
+    }
+
     public static void main(String[] args) {
         StringBuilder connectionURL = new StringBuilder();
         connectionURL.append(DATABASE_PROTOCOL).append(':')
@@ -19,17 +28,17 @@ public class BookstoreProgram {
                      .append(DATABASE_HOST).append(':')
                      .append(DATABASE_PORT).append('/')
                      .append(DATABASE_NAME).append("?useSSL=false");
+        CliHandler consoleHandler = new CliHandler();
         try {
             Connection connection = DriverManager.getConnection(
                     connectionURL.toString(),
                     DATABASE_USER, DATABASE_PASSWORD //TODO: Create a system user.
             );
-            CliHandler consoleHandler = new CliHandler();
-            ProgramState programState = MAIN_MENU;
+            ProgramState programState = ProgramState.MAIN_MENU;
             Book currentSelection = null;
 
             consoleHandler.printTitle();
-            while (programState != EXIT) {
+            while (programState != ProgramState.EXIT) {
                 switch (programState) {
                     case MAIN_MENU:
                         int menuSelection = -1;
@@ -41,35 +50,37 @@ public class BookstoreProgram {
                         programState = newStateFromMainMenu(menuSelection);
                         break;
                     case ADDING_BOOK:
-                        Book newBook = consoleHandler.getBookInfo();
+                        Book newBook = consoleHandler.getBookInfoFromUser();
                         BookTable.insertBook(connection,newBook);
                         currentSelection = newBook;
-                        programState = MAIN_MENU;
+                        programState = ProgramState.MAIN_MENU;
                         break;
-                    case DELETE;
-
-                        
-                        
+                    case DELETE_MENU:
+                        break;
+                    default:
+                        break;
                 }
             }
         } catch (SQLException ex) {
             System.out.println("Database error encountered: " + ex.getMessage());
         }
+
+        consoleHandler.cleanup();
     }
 
     private static ProgramState newStateFromMainMenu(int menuSelection){
         return switch(menuSelection) {
             case 1:
-                yield ADDING_BOOK;
+                yield ProgramState.ADDING_BOOK;
             case 2:
-                yield UPDATE_OPTIONS;
+                yield ProgramState.UPDATE_OPTIONS;
             case 3:
-                yield DELETE_MENU;
+                yield ProgramState.DELETE_MENU;
             case 4:
-                yield SEARCHING_MENU;
+                yield ProgramState.SEARCHING_MENU;
             default:
-                yield ERROR;
-        }
+                yield ProgramState.ERROR;
+        };
     }
 
 }
