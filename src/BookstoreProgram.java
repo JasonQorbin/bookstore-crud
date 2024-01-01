@@ -3,15 +3,6 @@ import java.sql.*;
 import sun.awt.www.content.audio.wav;
              
 public class BookstoreProgram {
-    //Default database parameters
-    private static final String DATABASE_NAME = "ebookstore";
-    private static final String DATABASE_PROTOCOL = "jdbc";
-    private static final String DATABASE_VENDOR = "mysql";
-    private static final String DATABASE_HOST = "localhost";
-    private static final String DATABASE_PORT = "3306";
-    private static final String DATABASE_USER = "Jason";
-    private static final String DATABASE_PASSWORD = "KochiraDozo";
-    
     private enum ProgramState {
         ERROR,
         MAIN_MENU,

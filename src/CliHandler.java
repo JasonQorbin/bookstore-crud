@@ -104,7 +104,7 @@ class CliHandler {
         return book;
     }
 
-    private String getString(String prompt, Predicate<String> predicate) {
+    private String getString(String prompt, Predicate predicate) {
         while(true) {
             System.out.print(prompt);
             String input = consoleReader.next();
@@ -118,7 +118,7 @@ class CliHandler {
         }
     }
 
-    private int getInt(String prompt, Predicate<Integer> predicate) { 
+    private int getInt(String prompt, Predicate predicate) { 
         int number = 0;
         while (true) {
             System.out.print(prompt);

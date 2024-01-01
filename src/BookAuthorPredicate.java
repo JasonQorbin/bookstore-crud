@@ -1,6 +1,6 @@
 import java.util.function.Predicate;
 
-class BookAuthorPredicate implements Predicate<String> {
+class BookAuthorPredicate implements Predicate {
     
     public static final int AUTHOR_MAX_LENGTH = 80;
     
@@ -15,7 +15,7 @@ class BookAuthorPredicate implements Predicate<String> {
     }
 
     @Override
-    public String toString(){
+    public String toString() {
         return message;
     }
 

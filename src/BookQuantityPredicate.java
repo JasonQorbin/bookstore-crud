@@ -1,7 +1,7 @@
 import java.util.function.Predicate;
 
-class BookQuantityPredicate implements Predicate<Integer> {
-    
+class BookQuantityPredicate implements Predicate {
+
     public boolean test(Integer quantity) {
         return quantity > 0;
     }

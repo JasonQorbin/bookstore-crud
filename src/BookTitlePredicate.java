@@ -1,6 +1,6 @@
 import java.util.function.Predicate;
 
-class BookTitlePredicate implements Predicate<String> {
+class BookTitlePredicate implements Predicate {
     
     public static final int TITLE_MAX_LENGTH = 80;
     
