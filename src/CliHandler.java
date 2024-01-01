@@ -135,6 +135,15 @@ class CliHandler {
         return number;
     }
 
+    public boolean confirmDeletion(Book book) {
+        String input = " ";
+        while (!input.equalsIgnoreCase("y") && !input.equalsIgnoreCase("n")) {
+            System.out.print("Are you sure you want to delete the selected record? [y/n] ");
+            input = consoleReader.next();
+        }
+        return input.equalsIgnoreCase("y");
+    }
+
     public void cleanup() {
         consoleReader.close();
     }

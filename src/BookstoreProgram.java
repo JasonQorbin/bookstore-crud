@@ -1,7 +1,9 @@
 import java.sql.*;
+
+import sun.awt.www.content.audio.wav;
              
 public class BookstoreProgram {
-    //Database parameters
+    //Default database parameters
     private static final String DATABASE_NAME = "ebookstore";
     private static final String DATABASE_PROTOCOL = "jdbc";
     private static final String DATABASE_VENDOR = "mysql";
@@ -22,18 +24,9 @@ public class BookstoreProgram {
     }
 
     public static void main(String[] args) {
-        StringBuilder connectionURL = new StringBuilder();
-        connectionURL.append(DATABASE_PROTOCOL).append(':')
-                     .append(DATABASE_VENDOR).append("://")
-                     .append(DATABASE_HOST).append(':')
-                     .append(DATABASE_PORT).append('/')
-                     .append(DATABASE_NAME).append("?useSSL=false");
         CliHandler consoleHandler = new CliHandler();
         try {
-            Connection connection = DriverManager.getConnection(
-                    connectionURL.toString(),
-                    DATABASE_USER, DATABASE_PASSWORD //TODO: Create a system user.
-            );
+            DataSource dataSource = new DataSource();
             ProgramState programState = ProgramState.MAIN_MENU;
             Book currentSelection = null;
 
@@ -51,12 +44,21 @@ public class BookstoreProgram {
                         break;
                     case ADDING_BOOK:
                         Book newBook = consoleHandler.getBookInfoFromUser();
-                        BookTable.insertBook(connection,newBook);
+                        int newID = BookTable.insertBook(connection,newBook);
+                        newBook.id = newID;
                         currentSelection = newBook;
                         programState = ProgramState.MAIN_MENU;
                         break;
                     case DELETE_MENU:
+                        if (consoleHandler.confirmDeletion(currentSelection)) {
+                            dataSource.deleteBook(currentSelection);
+                            currentSelection = null;
+                        }
+                        programState = ProgramState.MAIN_MENU;
                         break;
+                    case SEARCHING_MENU:
+                        consoleHandler.searchDialog();
+                        
                     default:
                         break;
                 }
@@ -78,6 +80,8 @@ public class BookstoreProgram {
                 yield ProgramState.DELETE_MENU;
             case 4:
                 yield ProgramState.SEARCHING_MENU;
+            case 0:
+                yield ProgramState.EXIT;
             default:
                 yield ProgramState.ERROR;
         };

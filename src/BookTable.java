@@ -125,15 +125,18 @@ public class BookTable {
      * table already exists. This method uses prepared statements to handle sanitising of the user input to prevent
      * SQL injection attacks.
      *
-     * @param statement A Statement object from the database connection.
+     * The return value is the ID of the new record, which is an auto incrementing column so the new value is found
+     *  as the max of the ID column.
+     *
+     * @param connection The database connection object.
      * @param title The title of the new book. (Does not need to be unique in the database)
      * @param author The author of the book
      * @param qty The  initial quantity of the book in stock.
      *
-     * @returns true if the database changed
+     * @returns The ID of the new record or -1 on failure
      *
      */
-    public static boolean insertBook(Connection connection, String title, String author, int qty) throws SQLException {
+    public static int insertBook(Connection connection, String title, String author, int qty) throws SQLException {
         StringBuilder queryBuilder = new StringBuilder();
         queryBuilder.append("INSERT INTO ").append(NAME).append(" (")
                 .append(COLUMN_TITLE).append(", ")
@@ -144,32 +147,94 @@ public class BookTable {
         statement.setString(1, author);
         statement.setInt(1, qty);
         int rowsAffected = statement.executeUpdate();
-
-        return rowsAffected > 0;
+        int newID = -1;
+        if (rowsAffected > 0) {
+            newID = getMaxID(connection);
+        }
+        return newID;
     }
-
-    public static boolean insertBook(Connection connection, Book newBook) throws SQLException{
+    
+    /**
+     * Inserts a new record into the books table using the data provided.
+     *
+     * @param connection The database {@link Connection} object
+     * @param newBook A {@link Book} object that will be inserted.
+     *
+     * @returns {@code true on success}
+     */
+    public static int insertBook(Connection connection, Book newBook) throws SQLException{
         return insertBook(connection, newBook.title, newBook.author, newBook.qty);
     }
 
+    public static int getMaxID(Connection connection) throws SQLException {
+        StringBuilder queryBuilder = new StringBuilder();
+        queryBuilder.append("SELECT MAX(").append(COLUMN_ID).append(") FROM ").append(NAME).append(';');
+        Statement statement = connection.createStatement();
+        ResultSet result = statement.executeQuery(queryBuilder.toString());
+        if (result.next()) {
+            return result.getInt(1);
+        } else {
+            return -1;
+        }
+    }
+    
+    /**
+     * Inserts the initial data into the books table.
+     *
+     * @param connection The database {@link Connection} object.
+     * @returns {@code true} on success.
+     */
     public static boolean insertInitialData(Connection connection) throws SQLException {
         boolean result = true;
 
         for (int index = 0; index < STARTING_TITLES.length; ++index) {
-            result = result && insertBook(
+            boolean success = insertBook (
                 connection, STARTING_TITLES[index],
                 STARTING_AUTHORS[index],
                 STARTING_QTY[index]
-            );
+            ) > 0;
+            result = result && success;
         }
         return result;
     }
-
+    
+    /**
+     * Convenience method to be used after the database is created initially. Creates the 
+     * books table and inserts the initial data.
+     *
+     * @returns {@code true} on success.
+     */
     public static boolean initialiseBookTable(Connection connection) throws SQLException {
         createTable(connection);
-        return  insertInitialData(connection);
+        return insertInitialData(connection);
+    }
+    
+    /**
+     * Checks to see if the Books table exists. This method assumes the database already exists.
+     * A SQL Exception will be thrown if the database doesn't exist yet.
+     *
+     * @param connection The database {@link Connection} object
+     * @returns {@code true} if the database table exists.
+     */
+    public static boolean tableExists(Connection connection) throws SQLException{
+        StringBuilder queryBuilder = new StringBuilder();
+        queryBuilder.append("SELECT * FROM information_schema.tables WHERE table_schema = '")
+            .append(DataSource.getDatabaseName()).append("' AND table_name = '")
+            .append(NAME).append("';");
+        Statement statement = connection.createStatement();
+        ResultSet result = statement.executeQuery(queryBuilder.toString());
+
+        return result.next();
     }
 
+    /**
+     * Deletes a record in the books table of the given ID number.
+     * 
+     * @param connection The database {@link Connection} object
+     * @param idToDelete The ID number of the record to delete.
+     *
+     * @returns {@code true} on success
+     */
     public static boolean deleteBook(Connection connection, int idToDelete) throws SQLException {
         StringBuilder queryBuilder = new StringBuilder();
         queryBuilder.append("DELETE FROM ").append(NAME)
@@ -178,32 +243,63 @@ public class BookTable {
         Statement statement = connection.createStatement();
         return statement.executeUpdate(queryBuilder.toString()) > 0;
     }
-
-    public static boolean updateTitle(Connection connection, int idToChange,String newTitle) throws SQLException{
+    
+    /**
+     * Helper method to create a template for UPDATE query Statements.
+     *
+     * @param column The name of the column being updated
+     * @returns A parameterized update statement.
+     */
+    private static String getUpdateQuery(String column) {
         StringBuilder queryBuilder = new StringBuilder();
-        queryBuilder.append("UPDATE ").append(NAME).append(" SET ").append(COLUMN_TITLE)
+        queryBuilder.append("UPDATE ").append(NAME).append(" SET ").append(column)
                     .append(" = ? WHERE ").append(COLUMN_ID).append(" = ?;");
-        PreparedStatement statement = connection.prepareStatement(queryBuilder.toString());
+        return queryBuilder.toString();
+    }
+    
+    /**
+     * Updates a record in the books table of the given ID number by changing the title.
+     * 
+     * @param connection The database {@link Connection} object
+     * @param idToChange The ID number of the record to update.
+     * @param newTitle   The new book title.
+     *
+     * @returns {@code true} on success
+     */
+    public static boolean updateTitle(Connection connection, int idToChange,String newTitle) throws SQLException{
+        PreparedStatement statement = connection.prepareStatement(getUpdateQuery(COLUMN_TITLE));
         statement.setString(1, newTitle);        
         statement.setInt(2, idToChange);
         return statement.executeUpdate() >0;
     }
 
+    /**
+     * Updates a record in the books table of the given ID number by changing the title.
+     * 
+     * @param connection The database {@link Connection} object
+     * @param idToChange The ID number of the record to update.
+     * @param newAuthor   The new book author.
+     *
+     * @returns {@code true} on success
+     */
     public static boolean updateAuthor(Connection connection, int idToChange,String newAuthor) throws SQLException{
-        StringBuilder queryBuilder = new StringBuilder();
-        queryBuilder.append("UPDATE ").append(NAME).append(" SET ").append(COLUMN_AUTHOR)
-                    .append(" = ? WHERE ").append(COLUMN_ID).append(" = ?;");
-        PreparedStatement statement = connection.prepareStatement(queryBuilder.toString());
+        PreparedStatement statement = connection.prepareStatement(getUpdateQuery(COLUMN_AUTHOR));
         statement.setString(1, newAuthor);        
         statement.setInt(2, idToChange);
         return statement.executeUpdate() >0;
     }
 
+    /**
+     * Updates a record in the books table of the given ID number by changing the title.
+     * 
+     * @param connection The database {@link Connection} object
+     * @param idToChange The ID number of the record to update.
+     * @param newQty   The new quantity.
+     *
+     * @returns {@code true} on success
+     */
     public static boolean updateQty(Connection connection, int idToChange, int newQty) throws SQLException{
-        StringBuilder queryBuilder = new StringBuilder();
-        queryBuilder.append("UPDATE ").append(NAME).append(" SET ").append(COLUMN_QTY)
-                    .append(" = ? WHERE ").append(COLUMN_ID).append(" = ?;");
-        PreparedStatement statement = connection.prepareStatement(queryBuilder.toString());
+        PreparedStatement statement = connection.prepareStatement(getUpdateQuery(COLUMN_QTY));
         statement.setInt(1, newQty);        
         statement.setInt(2, idToChange);
         return statement.executeUpdate() >0;
