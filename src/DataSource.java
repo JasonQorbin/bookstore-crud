@@ -1,5 +1,6 @@
 import java.sql.*;
-
+import java.util.ArrayList;
+import java.util.List;
 
 class DataSource {
     
@@ -40,36 +41,43 @@ class DataSource {
     }
     
     private boolean databaseExists() {
-        Statement statement = connection.createStatement;
+        Statement statement = connection.createStatement();
         StringBuilder query = new StringBuilder();
         query.append("select schema_name from information_schema.schemata where schema_name = '")
             .append(DATABASE_NAME).append("';");
         ResultSet result = statement.executeQuery(query.toString());
-
-        return result.next();
+        boolean answer = result.next();
+        statement.close();
+        return answer;
     }
 
     private void createDatabase() {
-        Statement statement = connection.createStatement;
+        Statement statement = connection.createStatement();
         StringBuilder query = new StringBuilder();
         query.append("CREATE DATABASE ")
             .append(DATABASE_NAME).append(";");
         statement.executeUpdate(query.toString());
+        statement.close();
     }
 
     public void initialiseDatabase() {
         if (!databaseExists()) {
             createDatabase();   
-        } 
+        }
+
         setDatabaseAsDefault();
-        if (bookTableExists()) {
+
+        if (!bookTableExists()) {
             initialiseBookTable();
         }
-        
     }
 
-    public void deleteBook (Book book) throws SQLException {
-        BookTable.deleteBook(connection, book.id);
+    private void setDatabaseAsDefault() {
+        Statement statement = connection.createStatement();
+        StringBuilder query = new StringBuilder();
+        query.append("USE ").append(DATABASE_NAME).append(';');
+        statement.executeUpdate(query.toString());
+        statement.close();
     }
 
     //Book table paramaters
@@ -105,13 +113,15 @@ class DataSource {
                     .append("\t").append(COLUMN_AUTHOR).append(" VARCHAR(40) NOT NULL,\n")
                     .append("\t").append(COLUMN_QTY)   .append(" INT DEFAULT 0\n")
                     .append(");");
-        statement.executeUpdate(queryBuilder.toString());
+        statement.addBatch(queryBuilder.toString());
         queryBuilder.setLength(0);
 
         //The task stipulates that the ID numbers should start from 3001;
         queryBuilder.append("ALTER TABLE ").append(BOOK_TABLE_NAME).append(" AUTO_INCREMENT = 3001;");
-        statement.executeUpdate(queryBuilder.toString());
-        queryBuilder.setLength(0);
+        statement.addBatch(queryBuilder.toString());
+
+        statement.executeBatch();
+        statement.close();
     }
 
     /**
@@ -162,8 +172,12 @@ class DataSource {
         int rowsAffected = statement.executeUpdate();
         int newID = -1;
         if (rowsAffected > 0) {
-            newID = getMaxID();
+            ResultSet keys = statement.getGeneratedKeys();
+            keys.next();
+            newID = keys.getInt(1);
+            keys.close();
         }
+        statement.close();
         return newID;
     }
 
@@ -176,18 +190,6 @@ class DataSource {
      */
     public int insertBook( Book newBook) throws SQLException {
         return insertBook(newBook.title, newBook.author, newBook.qty);
-    }
-
-    public int getMaxID() throws SQLException {
-        StringBuilder queryBuilder = new StringBuilder();
-        queryBuilder.append("SELECT MAX(").append(COLUMN_ID).append(") FROM ").append(BOOK_TABLE_NAME).append(';');
-        Statement statement = connection.createStatement();
-        ResultSet result = statement.executeQuery(queryBuilder.toString());
-        if (result.next()) {
-            return result.getInt(1);
-        } else {
-            return -1;
-        }
     }
 
     /**
@@ -204,8 +206,9 @@ class DataSource {
                 .append(BOOK_TABLE_NAME).append("';");
         Statement statement = connection.createStatement();
         ResultSet result = statement.executeQuery(queryBuilder.toString());
-
-        return result.next();
+        boolean success = result.next();
+        statement.close();
+        return success;
     }
 
     /**
@@ -221,7 +224,13 @@ class DataSource {
                 .append(" WHERE ").append(COLUMN_ID).append(" = ")
                 .append(idToDelete).append(';');
         Statement statement = connection.createStatement();
-        return statement.executeUpdate(queryBuilder.toString()) > 0;
+        boolean success = statement.executeUpdate(queryBuilder.toString()) > 0;
+        statement.close();
+        return success;
+    }
+
+    public boolean deleteBook(Book bookToDelete) throws SQLException {
+        return deleteBook(bookToDelete.id);
     }
 
     //Initital Data
@@ -312,4 +321,69 @@ class DataSource {
         }
         return result;
     }
+
+    private Book getBookFromResultSet (ResultSet resultSet) {
+        Book answer = new Book();
+        answer.id = resultSet.getInt(COLUMN_ID);
+        answer.title = resultSet.getString(COLUMN_TITLE);
+        answer.author = resultSet.getString(COLUMN_AUTHOR);
+        answer.qty = resultSet.getInt(COLUMN_QTY);
+        return answer;
+    }
+
+    public List<Book> searchBooks(CliHandler.SearchCriteria criteria, String searchTerm) throws SQLException {
+        StringBuilder queryPrefix = new StringBuilder();
+        queryPrefix.append("SELECT ")
+            .append(COLUMN_ID).append(", ")
+            .append(COLUMN_TITLE).append(", ")
+            .append(COLUMN_AUTHOR).append(", ")
+            .append(COLUMN_QTY).append(" FROM ").append(BOOK_TABLE_NAME)
+            .append(" WHERE ");
+        switch (criteria) {
+            case ByTitle:
+                queryPrefix.append(COLUMN_TITLE);
+                break;
+            case ByAuthor:
+                queryPrefix.append(COLUMN_AUTHOR);
+                break;
+            default:
+                throw new AssertionError("Invalid search criteria in searchBooks method");
+        }
+
+        StringBuilder query = new StringBuilder(); 
+        Statement statement = connection.createStatement();
+        
+        //Exact search
+        query.append(queryPrefix)
+            .append(" = '").append(searchTerm).append('\'');
+        statement.addBatch(query.toString());
+        query.setLength(0);
+
+        //Search term as a prefix/suffix
+        query.append(queryPrefix)
+            .append(" LIKE '%_").append(searchTerm).append("_%\'");
+        statement.addBatch(query.toString());
+        
+        statement.executeBatch();
+
+        ArrayList<Book> answer = new ArrayList<>();
+        
+        boolean haveResultSet = statement.getMoreResults();
+        while (haveResultSet) {
+            ResultSet resultSet = statement.getResultSet();
+            while (resultSet.next()) {
+                Book newBook = getBookFromResultSet(resultSet);
+                answer.add(newBook);
+            }
+        }
+        
+        statement.close();
+
+        return answer;
+    }
+
+    public void close() {
+        connection.close();
+    }
+
 }

@@ -1,14 +1,13 @@
 import java.sql.*;
 
 import sun.awt.www.content.audio.wav;
-             
+
 public class BookstoreProgram {
     private enum ProgramState {
         ERROR,
         MAIN_MENU,
         ADDING_BOOK,
         SEARCHING_MENU,
-        SEARCH_RESULTS,
         UPDATE_OPTIONS,
         DELETE_MENU,
         EXIT
@@ -17,7 +16,7 @@ public class BookstoreProgram {
     public static void main(String[] args) {
         CliHandler consoleHandler = new CliHandler();
         try {
-            DataSource dataSource = new DataSource();
+            DataSource dataSource = DataSource.getInstance();
             ProgramState programState = ProgramState.MAIN_MENU;
             Book currentSelection = null;
 
@@ -35,7 +34,7 @@ public class BookstoreProgram {
                         break;
                     case ADDING_BOOK:
                         Book newBook = consoleHandler.getBookInfoFromUser();
-                        int newID = BookTable.insertBook(connection,newBook);
+                        int newID = dataSource.insertBook(newBook);
                         newBook.id = newID;
                         currentSelection = newBook;
                         programState = ProgramState.MAIN_MENU;
@@ -48,12 +47,15 @@ public class BookstoreProgram {
                         programState = ProgramState.MAIN_MENU;
                         break;
                     case SEARCHING_MENU:
-                        consoleHandler.searchDialog();
-                        
+                        currentSelection = consoleHandler.searchDialog();
+                        programState = ProgramState.MAIN_MENU;
+                        break;
                     default:
+                        //TODO: Logging
                         break;
                 }
             }
+            dataSource.close();
         } catch (SQLException ex) {
             System.out.println("Database error encountered: " + ex.getMessage());
         }
