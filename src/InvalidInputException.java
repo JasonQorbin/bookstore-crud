@@ -1,3 +1,0 @@
-class InvalidInputException extends Exception {
-
-}

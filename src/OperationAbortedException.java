@@ -1,2 +1,0 @@
-class OperationAbortedException extends Exception {
-}
