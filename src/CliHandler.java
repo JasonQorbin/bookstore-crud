@@ -1,10 +1,9 @@
+import java.sql.SQLException;
 import java.util.Scanner;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.function.Predicate;
 import java.util.InputMismatchException;
 import java.util.NoSuchElementException;
-import java.io.IOException;
 
 class CliHandler {
     Scanner consoleReader;
@@ -22,8 +21,19 @@ class CliHandler {
         );
         System.out.println();
     }
-    
+
+    /**
+     * Prints the main menu and returns the user's selection. This version of the menu requires a book to be selected
+     * because there are options that are only relevant when something is selected.
+     *
+     * @param selectedBook The book that is currently selected.
+     * @return The user's selection
+     */
     public int printMainMenu(Book selectedBook) {
+        if (selectedBook == null) {
+            //Nothing selected. Call the version of the menu without the extra options.
+            return printMainMenu();
+        }
         System.out.println(
             """
             1. Add a new book
@@ -33,35 +43,18 @@ class CliHandler {
             0. Exit
             """
         );
-        System.out.println();
         System.out.println("Selected book: "
-            + selectedBook.title + " by " + selectedBook.author + " (" + selectedBook.qty + ")");
+            + selectedBook.title + " by " + selectedBook.author + " (" + selectedBook.qty + ")\n");
         boolean haveValidInput = false;
-        int input = -1;
-        while (!haveValidInput) {
-            try {
-                System.out.print("Menu choice: ");
-                input = consoleReader.nextInt();
-            } catch (InputMismatchException exc) {
-                //The input received isn't an integer
-                continue;
-            } catch (NoSuchElementException exc) {
-                //No input found.
-                continue;
-            }
-
-            if (input > 4 || input < 0 ) {
-                //Input was valid but out of range.
-                //Try again
-                continue;
-            } else {
-                haveValidInput = true;
-            }
-        }    
-        return input;
+        return getMenuChoice("Menu choice: ", 0, 4);
     }
 
-
+    /**
+     * Prints the main menu and returns the user's selection. This version of the menu is called when there is no
+     * currently selected book and thus excludes any menu options that require a selection.
+     *
+     * @return The user's selection
+     */
     public int printMainMenu() {
         System.out.println(
             """
@@ -71,82 +64,107 @@ class CliHandler {
             """
         );
         System.out.println();
-        boolean haveValidInput = false;
-        int input = -1;
-        while (!haveValidInput) {
-            try {
-                System.out.print("Menu choice: ");
-                input = consoleReader.nextInt();
-            } catch (InputMismatchException exc) {
-                //The input received doesn't appear to be an integer
-                continue;
-            } catch (NoSuchElementException exc) {
-                //No input received
-                continue;
-            }
-
-            if (input > 2 || input < 0 ) {
-                //Input was valid but out of range.
-                //Try again
-                continue;
-            } else {
-                haveValidInput = true;
-            }
-        }
-        return input;
+        return getMenuChoice("Menu choice: ", 0, 2);
     }
 
-    public Book getBookInfoFromUser() {
+    /**
+     * The method called by selecting 'Add to Book' from the menu. Collects the information from the
+     * user and calls to the database as needed.
+     *
+     * @return The book that should be the new currently selected book (may be a new or existing book)
+     * @throws DatabaseException If an error occurs when calling the database.
+     */
+    public Book addBook() throws DatabaseException{
+        try {
+            Book newBook = getBookInfoFromUser();
+            if (newBook.id == -1) {
+                newBook.id = DataSource.getInstance().insertBook(newBook);
+            }
+            return newBook;
+        } catch (SQLException ex) {
+            throw new DatabaseException("Database error encountered while adding a new book record.", ex);
+        }
+    }
+
+    /**
+     * Method to collect the information for a new book record from the user.
+     *
+     * After getting the book title, it requests a search of the database for the first 3 characters to first a list of
+     * possible existing records that match the one being added. If something is found the method gives the user the
+     * opportunity to select the existing record instead  of creating a new one.
+     *
+     * @return An existing {@link Book} record or on containing the information of a new record with the id set to -1
+     * @throws SQLException If an error occurs while searching for existing records.
+     */
+    private Book getBookInfoFromUser() throws SQLException{
         Book book = new Book();
-        
-        book.title =  getString("Book title: ", new BookTitlePredicate());
-        book.author = getString("Book author: ", new BookAuthorPredicate());
-        book.qty = getInt("Starting quantity: ", new BookQuantityPredicate());
-        
+
+        book.title =  getTitleFromUser("Book title: ");
+        ArrayList<Book> searchResults = new ArrayList<>(DataSource.getInstance().searchBooks(SearchCriteria.ByTitle, book.title.substring(0,3)));
+        if (!searchResults.isEmpty()) {
+            System.out.println(
+                """
+                We've found a few existing records that are very similar to the book you are adding.
+                Perhaps consider selecting one of these existing records instead.
+                Select a record below or cancel (enter 0) to continue adding a new book:
+                """);
+            Book selection = printAndPickResult(searchResults);
+            if (selection != null) {
+                return selection;
+            }
+        }
+        book.author = getAuthorFromUser("Book author: ");
+        book.qty = getQtyFromUser("Starting quantity: ");
+        book.id = -1;
         return book;
     }
 
-    private String getString(String prompt, Predicate predicate) {
-        while(true) {
-            System.out.print(prompt);
-            String input = consoleReader.next();
-            
-            if (predicate.test(input)) {
-                return input;
-            } else {
-                System.out.println(predicate.toString());
-                continue;
+    /**
+     * Called from the Main menu when the user requests that the selected book be deleted. Displays a message asking
+     * the user to confirm the action and then calls the appropriate database method to do the deletion.
+     * @param bookToDelete A {@link Book} object representing the record to be deleted.
+     * @return {@code true} if the database is successfully modified.
+     * @throws DatabaseException If a database error occurs.
+     */
+    public boolean deleteBook(Book bookToDelete) throws DatabaseException{
+        boolean userConfirmed = confirmDeletion(bookToDelete);
+        if (userConfirmed) {
+            try {
+                DataSource.getInstance().deleteBook(bookToDelete);
+                return true;
+            } catch (SQLException ex) {
+                throw new DatabaseException("Database error encountered while deleting book record.", ex);
             }
+        } else {
+            return false;
         }
     }
 
-    private int getInt(String prompt, Predicate predicate) { 
-        int number = 0;
-        while (true) {
-            System.out.print(prompt);
-            try {    
-                number = consoleReader.nextInt();
-            } catch (InputMismatchException inputEx) {
-                System.out.println("The amount entered should be an integer.");
-                continue;
-            }
-            if (predicate.test(number)) {
-                break;
-            }
-        }
-        return number;
-    }
-
-    public boolean confirmDeletion(Book book) {
+    /**
+     * Displays a message to the user asking them to confirm that they want to delete the selected record.
+     *
+     * @param book A {@link Book} object representing the record to be deleted.
+     * @return {@code true} if the user confirmed. {@code false} if the user wants to cancel the operation.
+     */
+    private boolean confirmDeletion(Book book) {
         String input = " ";
         while (!input.equalsIgnoreCase("y") && !input.equalsIgnoreCase("n")) {
             System.out.print("Are you sure you want to delete the selected record? [y/n] ");
-            input = consoleReader.next();
+            input = consoleReader.nextLine();
         }
         return input.equalsIgnoreCase("y");
     }
 
-    public Book searchDialog() {
+    /**
+     * Allows the user to search through the database records and select one for further action.
+     * Called from the main menu.
+     * Gives the user the option to search by Title or by Author. The users search string is passed o to the appropriate
+     * method to search the database.
+     *
+     * @return A {@link Book} object representing the new selection.
+     * @throws DatabaseException If a database error occurs during the search.
+     */
+    public Book searchDialog() throws DatabaseException{
         System.out.println("""
             How would you like to search:
 
@@ -157,12 +175,48 @@ class CliHandler {
         
         //TODO: Repeating code block used to get and validate input. Put in method.
         System.out.println();
+        int input = getMenuChoice("Menu choice: ", 0, 2);
+        ArrayList<Book> searchResults;
+        System.out.println();
+
+        try {
+            if (input == 0) { //Operation aborted. No new selection.
+                return null;
+            } else if (input == 1) {
+                searchResults = new ArrayList<Book>(searchByTitleDialog());
+            } else if (input == 2) {
+                searchResults = new ArrayList<Book>(searchByAuthorDialog());
+            } else {
+                throw new AssertionError("Unhandled menu choice" + input + " encountered in search dialog");
+            }
+        } catch (SQLException sqlEx) {
+            throw new DatabaseException("Database error encountered while performing search." , sqlEx);
+        }
+
+        if (searchResults.isEmpty()) {
+            System.out.println(" -- No search results -- ");
+            return null;
+        } else {
+            return printAndPickResult(searchResults);
+        }
+    }
+
+    /**
+     * Helper method for getting user input for a menu and validating it.
+     *
+     * @param prompt The prompt displayed to the user asking for input.
+     * @param minChoice The smallest acceptable integer input from the user.
+     * @param maxChoice The largest acceptable integer input from the user.
+     * @return The user's selection.
+     */
+    private int getMenuChoice(String prompt, int minChoice, int maxChoice) {
         boolean haveValidInput = false;
-        int input = -1;
+        int input = minChoice -1;
         while (!haveValidInput) {
             try {
-                System.out.print("Menu choice: ");
+                System.out.print(prompt);
                 input = consoleReader.nextInt();
+                consoleReader.nextLine();
             } catch (InputMismatchException exc) {
                 //The input received doesn't appear to be an integer
                 continue;
@@ -171,7 +225,7 @@ class CliHandler {
                 continue;
             }
 
-            if (input > 2 || input < 0 ) {
+            if (input > maxChoice || input < minChoice ) {
                 //Input was valid but out of range.
                 //Request input again.
                 continue;
@@ -179,28 +233,18 @@ class CliHandler {
                 haveValidInput = true;
             }
         }
-        ArrayList<Book> searchResults;
-        System.out.println();
-        if (input == 0) { //Operation aborted. No new selection.
-            return null;
-        } else if (input == 1) {
-            searchResults = new ArrayList<Book>(searchByTitleDialog());
-        } else if (input == 2) {
-            searchResults = new ArrayList<Book>(searchByAuthorDialog());
-        } else {
-            throw new AssertionError("Unhandled menu choice" + input + " encountered in search dialog");
-        }
-
-        if ( searchResults.size() == 0 ) {
-            System.out.println(" -- No search results -- ");
-            return null;
-        } else {
-            Book selection = printAndPickResult(searchResults);
-            return selection;
-        }
+        return input;
     }
 
-    private Book printAndPickResult(ArrayList<Book> searchResults) {
+    /**
+     * Helper method to print out a list of {@link Book} objects and ask the user to select one.
+     *
+     * Called on search results received from a database search method.
+     *
+     * @param searchResults A List of {@link Book} objects to select from.
+     * @return The selected {@link Book}.
+     */
+    private Book printAndPickResult(List<Book> searchResults) {
         System.out.println(" -- Search results -- ");
         System.out.println();
         for (int index = 0; index < searchResults.size(); ++index) {
@@ -211,52 +255,301 @@ class CliHandler {
             result.append(index + 1);
             result.append(" - ");
             result.append(searchResults.get(index).toString());
+            System.out.println(result);
         }
 
-        int choice = 0;
-        boolean haveValidInput = false;
-        while (!haveValidInput) {
-            choice = 0;
-            System.out.println();
-            System.out.print("Select a result [0 to cancel]: ");
-            try {
-                choice = consoleReader.nextInt();
-                haveValidInput = choice >= 0 && choice < (searchResults.size() + 1);
-            } catch (InputMismatchException exc) {
-                System.out.println("Please enter a number above or 0 to cancel");
-            } catch (NoSuchElementException exc) {
-                System.out.println("Please enter a number above or 0 to cancel");
-            }
-        }
-
+        int choice = getMenuChoice("Select a result [0 to cancel]: ", 0, searchResults.size());
         if (choice == 0) {
             return null;
         } else {
             return searchResults.get(choice -1);
         }
     }
-    
+
+    /**
+     * Allows methods to signal whether a search should be done by Book title or author so that the database query
+     * can be constructed correctly.
+     */
     public static enum SearchCriteria {
         ByTitle,
         ByAuthor
     }
 
-    private List<Book> searchByTitleDialog() {
-        return searchbyCriteria("Book title to search for (Leave blank to show all records) : ", SearchCriteria.ByTitle);
+    /**
+     * Displays a prompt to the user asking them to enter a book title to search for
+     *
+     * @return A list of search results (Books)
+     * @throws SQLException If the underlying database call fails.
+     */
+    private List<Book> searchByTitleDialog() throws SQLException{
+        return searchByCriteria("Book title to search for (Leave blank to show all records) : ", SearchCriteria.ByTitle);
+    }
+    /**
+     *
+     * Displays a prompt to the user asking them to enter a book author to search for
+     *
+     * @return A list of search results (Books)
+     * @throws SQLException If the underlying database call fails.
+     */
+    private List<Book> searchByAuthorDialog() throws SQLException {
+        return searchByCriteria("Book author to search for (Leave blank to show all records) : ", SearchCriteria.ByAuthor);
     }
 
-    private List<Book> searchByAuthorDialog() {
-        return searchbyCriteria("Book author to search for (Leave blank to show all records) : ", SearchCriteria.ByAuthor);
-    }
-
-    private List<Book> searchbyCriteria(String prompt, SearchCriteria criteria) {
+    /**
+     * Helper function that reads the search term from the user as input and passes it to the datasource.
+     *
+     * @return A list of search results (Books)
+     * @throws SQLException If the underlying database call fails.
+     */
+    private List<Book> searchByCriteria(String prompt, SearchCriteria criteria) throws SQLException {
         System.out.print(prompt);
         String searchString = consoleReader.nextLine();
 
         return DataSource.getInstance().searchBooks(criteria, searchString);
     }
 
-    public void cleanup() {
+    /**
+     * Displays the update menu which asks the user which parameter they would like to update.
+     * Called from the main menu.
+     *
+     * @param selectedBook The currently selected book which will be modified.
+     * @return {@code true} if the database is actually modified by this operation.
+     * @throws DatabaseException If an error occurs in the underlying database call.
+     */
+    public boolean updateMenu(Book selectedBook) throws DatabaseException{
+        System.out.println("""
+                What would you like to change in the selected item?
+                1. Book title
+                2. Author
+                3. Quantity
+                """);
+        int choice = getMenuChoice("Make a selection [0 to cancel]: ", 0, 3);
+
+        boolean changed = false;
+        try {
+            switch (choice) {
+                case 0:
+                    return false;
+                case 1:
+                    changed = updateTitle(selectedBook);
+                    break;
+                case 2:
+                    changed = updateAuthor(selectedBook);
+                    break;
+                case 3:
+                    changed = updateQty(selectedBook);
+                    break;
+            }
+        } catch (SQLException sqlEx) {
+            throw new DatabaseException("Database error encountered while updating existing record", sqlEx);
+        }
+        System.out.println();
+        return changed;
+    }
+
+    /**
+     * Prompts the user for a new book title and then calls the appropriate database method to make the
+     * change if necessary.
+     *
+     * @param selectedBook The currently selected book that will be modified.
+     * @return {@code true} if the database is actually modified by this operation.
+     * @throws DatabaseException If an error occurs in the underlying database call.
+     */
+    private boolean updateTitle(Book selectedBook) throws SQLException{
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("Current title: ").append(selectedBook.title).append("\nEnter new title [leave blank to cancel]: ");
+        String newTitle = getTitleFromUser(prompt.toString(), true);
+        System.out.println();
+        if (!newTitle.equals(selectedBook.title)) {
+            if (DataSource.getInstance().updateTitle(selectedBook, newTitle)) {
+                selectedBook.title = newTitle;
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Prompts the user for a new book author and then calls the appropriate database method to make the
+     * change if necessary.
+     *
+     * @param selectedBook The currently selected book that will be modified.
+     * @return {@code true} if the database is actually modified by this operation.
+     * @throws DatabaseException If an error occurs in the underlying database call.
+     */
+    private boolean updateAuthor(Book selectedBook) throws SQLException{
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("Current author: ").append(selectedBook.author).append("\nEnter new author [leave blank to cancel]: ");
+        String newAuthor = getAuthorFromUser(prompt.toString(),  true);
+        System.out.println();
+        if (!newAuthor.equals(selectedBook.author)) {
+            if (DataSource.getInstance().updateAuthor(selectedBook, newAuthor)) {
+                selectedBook.author = newAuthor;
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Prompts the user for a new book quantity and then calls the appropriate database method to make the
+     * change if necessary.
+     *
+     * @param selectedBook The currently selected book that will be modified.
+     * @return {@code true} if the database is actually modified by this operation.
+     * @throws DatabaseException If an error occurs in the underlying database call.
+     */
+    private boolean updateQty(Book selectedBook) throws SQLException{
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("Current quantity: ").append(selectedBook.qty).append("\nEnter new qty [leave blank to cancel]: ");
+        int newQty = getQtyFromUser(prompt.toString(), true);
+        System.out.println();
+        if (newQty == -1){
+            return false;
+        }
+        if (newQty != selectedBook.qty) {
+            if (DataSource.getInstance().updateQty(selectedBook, newQty)) {
+                selectedBook.qty = newQty;
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Helper method for asking the user to input a book title with a given prompt.
+     * The method does input validation by checking the length of the input against the database column parameters.
+     *
+     * @param prompt The prompt that should be shown to the user to ask for the book title.
+     * @param allowBlankAnswer {@code true} if blank titles should be allowed by the validation check.
+     * @return The user input.
+     */
+    private String getTitleFromUser(String prompt, boolean allowBlankAnswer) {
+        String title = "";
+        boolean valid = false;
+
+        while (!valid) {
+            System.out.print(prompt);
+            title = consoleReader.nextLine();
+            if (title.isBlank() && allowBlankAnswer){
+                return title;
+            }
+            if (title.isBlank()){
+                System.out.println("Titles can't be blank.");
+            } else if (title.length() > DataSource.COLUMN_TITLE_SIZE) {
+                System.out.println("Maximum length is " + DataSource.COLUMN_TITLE_SIZE + " characters");
+            } else {
+                valid = true;
+            }
+        }
+
+        return title;
+    }
+
+    /**
+     * Helper method for asking the user to input a book title with a given prompt.
+     * Defaults to not allowing blank input.
+     * @param prompt The prompt that should be shown to the user to ask for the book title.
+     * @return The user input.
+     */
+    private String getTitleFromUser(String prompt) {
+        return getTitleFromUser(prompt, false);
+    }
+
+    /**
+     * Helper method for asking the user to input a book author with a given prompt.
+     * The method does input validation by checking the length of the input against the database column parameters.
+     *
+     * @param prompt The prompt that should be shown to the user to ask for the book author.
+     * @param allowBlankAnswer {@code true} if blank authors should be allowed by the validation check.
+     * @return The user input.
+     */
+    private String getAuthorFromUser(String prompt, boolean allowBlankAnswer) {
+        String author = "";
+        boolean valid = false;
+
+        while (!valid) {
+            System.out.print(prompt);
+            author = consoleReader.nextLine();
+            if (author.isBlank() && allowBlankAnswer){
+                return author;
+            }
+            if (author.isBlank()){
+                System.out.println("Author can't be blank.");
+            } else if (author.length() > DataSource.COLUMN_AUTHOR_SIZE) {
+                System.out.println("Maximum length is " + DataSource.COLUMN_AUTHOR_SIZE + " characters");
+            } else {
+                valid = true;
+            }
+        }
+
+        return author;
+    }
+
+    /**
+     * Helper method for asking the user to input a book author with a given prompt.
+     * Defaults to not allowing blank input.
+     * @param prompt The prompt that should be shown to the user to ask for the book author.
+     * @return The user input.
+     */
+    private String getAuthorFromUser(String prompt) {
+        return getAuthorFromUser(prompt, false);
+    }
+
+    /**
+     * Helper method for asking the user to input a book quantity with a given prompt.
+     * The method does input validation by only allowing numbers zero or higher because one cannot have
+     * a negative number of copies of a book in stock.
+     *
+     * @param prompt The prompt that should be shown to the user to ask for the book quantity.
+     * @param allowBlankAnswer {@code true} if blank input should be allowed by the validation check (Typically to
+     *                                     allow the user to cancel the current operation by entering nothing.
+     * @return The user input or -1 if a blank answer was accepted.
+     */
+    private int getQtyFromUser(String prompt, boolean allowBlankAnswer) {
+        int qty = -1;
+        boolean valid = false;
+
+        while (!valid) {
+            System.out.print(prompt);
+            try {
+                qty = consoleReader.nextInt();
+                consoleReader.nextLine();
+                valid = true;
+            } catch (InputMismatchException exc) {
+                System.out.println("Please enter a positive integer");
+            } catch (NoSuchElementException exc) {
+                if (allowBlankAnswer) return -1;
+            }
+        }
+        System.out.println();
+        return qty;
+    }
+
+    /**
+     * Helper method for asking the user to input a book quantity with a given prompt. Defaults to not allowing
+     * blank input.
+     * @param prompt The prompt that should be shown to the user to ask for the book author.
+     * @return The user input.
+     */
+    private int getQtyFromUser(String prompt)  {
+        return getQtyFromUser(prompt, false);
+    }
+
+    /**
+     * Closes the connection to the console. Should only be called once at the end of the program when no more input
+     * is needed from the user.
+     */
+    public void close() {
         consoleReader.close();
     }
 }
