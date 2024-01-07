@@ -36,6 +36,9 @@ class CliHandler {
         }
         System.out.println(
             """
+            Main  Menu
+            ==========
+            
             1. Add a new book
             2. Search/select books
             3. Update selected book
@@ -58,6 +61,9 @@ class CliHandler {
     public int printMainMenu() {
         System.out.println(
             """
+            Main Menu
+            =========
+            
             1. Add a new book
             2. Search/select books
             0. Exit
@@ -151,6 +157,7 @@ class CliHandler {
         while (!input.equalsIgnoreCase("y") && !input.equalsIgnoreCase("n")) {
             System.out.print("Are you sure you want to delete the selected record? [y/n] ");
             input = consoleReader.nextLine();
+            System.out.println();
         }
         return input.equalsIgnoreCase("y");
     }
@@ -233,6 +240,7 @@ class CliHandler {
                 haveValidInput = true;
             }
         }
+        System.out.println();
         return input;
     }
 
@@ -257,8 +265,9 @@ class CliHandler {
             result.append(searchResults.get(index).toString());
             System.out.println(result);
         }
-
+        System.out.println();
         int choice = getMenuChoice("Select a result [0 to cancel]: ", 0, searchResults.size());
+        System.out.println();
         if (choice == 0) {
             return null;
         } else {
@@ -323,7 +332,9 @@ class CliHandler {
                 2. Author
                 3. Quantity
                 """);
+
         int choice = getMenuChoice("Make a selection [0 to cancel]: ", 0, 3);
+        System.out.println();
 
         boolean changed = false;
         try {
@@ -353,13 +364,13 @@ class CliHandler {
      *
      * @param selectedBook The currently selected book that will be modified.
      * @return {@code true} if the database is actually modified by this operation.
-     * @throws DatabaseException If an error occurs in the underlying database call.
+     * @throws SQLException If an error occurs in the underlying database call.
      */
     private boolean updateTitle(Book selectedBook) throws SQLException{
         StringBuilder prompt = new StringBuilder();
         prompt.append("Current title: ").append(selectedBook.title).append("\nEnter new title [leave blank to cancel]: ");
         String newTitle = getTitleFromUser(prompt.toString(), true);
-        System.out.println();
+
         if (!newTitle.equals(selectedBook.title)) {
             if (DataSource.getInstance().updateTitle(selectedBook, newTitle)) {
                 selectedBook.title = newTitle;
@@ -378,13 +389,13 @@ class CliHandler {
      *
      * @param selectedBook The currently selected book that will be modified.
      * @return {@code true} if the database is actually modified by this operation.
-     * @throws DatabaseException If an error occurs in the underlying database call.
+     * @throws SQLException If an error occurs in the underlying database call.
      */
     private boolean updateAuthor(Book selectedBook) throws SQLException{
         StringBuilder prompt = new StringBuilder();
         prompt.append("Current author: ").append(selectedBook.author).append("\nEnter new author [leave blank to cancel]: ");
         String newAuthor = getAuthorFromUser(prompt.toString(),  true);
-        System.out.println();
+
         if (!newAuthor.equals(selectedBook.author)) {
             if (DataSource.getInstance().updateAuthor(selectedBook, newAuthor)) {
                 selectedBook.author = newAuthor;
@@ -403,13 +414,13 @@ class CliHandler {
      *
      * @param selectedBook The currently selected book that will be modified.
      * @return {@code true} if the database is actually modified by this operation.
-     * @throws DatabaseException If an error occurs in the underlying database call.
+     * @throws SQLException If an error occurs in the underlying database call.
      */
     private boolean updateQty(Book selectedBook) throws SQLException{
         StringBuilder prompt = new StringBuilder();
         prompt.append("Current quantity: ").append(selectedBook.qty).append("\nEnter new qty [leave blank to cancel]: ");
         int newQty = getQtyFromUser(prompt.toString(), true);
-        System.out.println();
+
         if (newQty == -1){
             return false;
         }

@@ -8,10 +8,10 @@ class DataSource {
     private static final String DATABASE_NAME = "ebookstore";
     private static final String DATABASE_PROTOCOL = "jdbc";
     private static final String DATABASE_VENDOR = "mysql";
-    private static final String DATABASE_HOST = "localhost";
+    private static final String DATABASE_HOST = "localhost";//"database";
     private static final String DATABASE_PORT = "3306";
-    private static final String DATABASE_USER = "Jason"; //TODO: Replace username and password
-    private static final String DATABASE_PASSWORD = "KochiraDozo";
+    private static final String DATABASE_USER = "Librarian";
+    private static final String DATABASE_PASSWORD = "Applecart";
 
     
     private Connection connection;
@@ -39,12 +39,40 @@ class DataSource {
      * and the database is reachable and running.
      */
     private DataSource() throws SQLException {
-        connection = DriverManager.getConnection(
-            getConnectionURL(),
-            DATABASE_USER, DATABASE_PASSWORD
-        );
+        int retryCounter = 0;
+        boolean success = false;
+        while(!success) {
+            try {
+                ++retryCounter;
+                System.out.println("Connecting to database server (attempt " + retryCounter + ")");
+                connection = DriverManager.getConnection(
+                        getConnectionURL(),
+                        DATABASE_USER, DATABASE_PASSWORD
+                );
+                success = true;
+            } catch (SQLException ex) {
+                System.out.println("Connection failed. Retrying in 10 seconds...");
+                try {
+                    Thread.sleep(10 * 1000);
+                } catch (InterruptedException intEx) {
+                    System.out.println("Aborted. Exiting.");
+                    connection = null;
+                    return;
+                }
+
+                if (retryCounter >= 10)  {
+                    connection = null;
+                    return;
+                }
+            }
+        }
         initialiseDatabase();
     }
+
+    public boolean haveConnection(){
+        return connection != null;
+    }
+
     //------
 
     /**
@@ -58,6 +86,7 @@ class DataSource {
             .append(DATABASE_HOST).append(':')
             .append(DATABASE_PORT).append('/')
             .append("?useSSL=false");
+
         return connectionURL.toString();
     }
 
@@ -284,8 +313,7 @@ class DataSource {
         "The Cruel Prince",
         "Empire of Storms",
         "Harry Potter and the Prisoner of Azkaban",
-        "Harry Potter and the Chamber of Secrets",
-        "Harry Potter and the Goblet of Fire"
+        "Harry Potter and the Chamber of Secrets"
     };
 
     private final String STARTING_AUTHORS [] = {
@@ -306,7 +334,6 @@ class DataSource {
         "Sara Holland",
         "Holly Black",
         "Sarah J Maas",
-        "J.K. Rowling",
         "J.K. Rowling",
         "J.K. Rowling"
     };
@@ -330,8 +357,7 @@ class DataSource {
         30,
         734,
         41,
-        61,
-        91
+        61
     };
 
     /**
@@ -344,18 +370,17 @@ class DataSource {
         query.append("INSERT INTO ").append(BOOK_TABLE_NAME).append(" (")
                 .append(COLUMN_TITLE).append(", ")
                 .append(COLUMN_AUTHOR).append(", ")
-                .append(COLUMN_QTY).append(", ")
+                .append(COLUMN_QTY)
                 .append(") VALUES ( ?, ?, ? );");
-
+        System.out.println(query);
         PreparedStatement statement = connection.prepareStatement(query.toString());
         for (int index = 0; index < STARTING_TITLES.length; ++index) {
             statement.setString(1,STARTING_TITLES[index]);
             statement.setString(2,STARTING_AUTHORS[index]);
             statement.setInt(3,STARTING_QTY[index]);
-            statement.addBatch();
+            statement.executeUpdate();
             statement.clearParameters();
         }
-        statement.executeBatch();
         statement.close();
     }
 
