@@ -547,6 +547,19 @@ class CliHandler {
     }
 
     /**
+     * Helper method to get a String from the user without any validation checks
+     *
+     * @param prompt The text to display prompting the user for input.
+     * @return The String from the user.
+     */
+    public String getStringFromUser(String prompt) {
+        System.out.print(prompt);
+        String answer = consoleReader.nextLine();
+        System.out.println();
+        return answer;
+    }
+
+    /**
      * Helper method for asking the user to input a book quantity with a given prompt. Defaults to not allowing
      * blank input.
      * @param prompt The prompt that should be shown to the user to ask for the book author.

@@ -6,14 +6,8 @@ class DataSource {
     
     //Default database parameters
     private static final String DATABASE_NAME = "ebookstore";
-    private static final String DATABASE_PROTOCOL = "jdbc";
-    private static final String DATABASE_VENDOR = "mysql";
-    private static final String DATABASE_HOST = "localhost";//"database";
-    private static final String DATABASE_PORT = "3306";
-    private static final String DATABASE_USER = "Librarian";
-    private static final String DATABASE_PASSWORD = "Applecart";
 
-    
+    private DatabaseCredentials credentials;
     private Connection connection;
 
     // Singleton pattern (instance, instance-getter & private constructor)
@@ -21,14 +15,26 @@ class DataSource {
     private static DataSource instance;
 
     /**
-     * Returns the static instance of the singleton DataSource, instantiating one if it doesn't exist yet.
+     * Returns the static instance of the singleton DataSource.
      * @return A reference to the DataSource object
      * @throws SQLException If a connection could not be established. Ensure that the connection parameters are correct
      * and the database is reachable and running.
      */
     public static DataSource getInstance() throws SQLException{
+        return instance;
+    }
+
+    /**
+     * Returns the static instance of the singleton DataSource, instantiating one if it doesn't exist yet using the
+     * set of credentials provided.
+     * @param newCredentials The DatabaseCredentials object to apply.
+     * @return A reference to the DataSource object
+     * @throws SQLException If a connection could not be established. Ensure that the connection parameters are correct
+     * and the database is reachable and running.
+     */
+    public static DataSource getInstance(DatabaseCredentials newCredentials) throws SQLException{
         if (instance == null) {
-            instance = new DataSource();
+            instance = new DataSource(newCredentials);
         }
         return instance;
     }
@@ -38,7 +44,8 @@ class DataSource {
      * @throws SQLException If a connection could not be established. Ensure that the connection parameters are correct
      * and the database is reachable and running.
      */
-    private DataSource() throws SQLException {
+    private DataSource(DatabaseCredentials credentials) throws SQLException {
+        this.credentials = credentials;
         int retryCounter = 0;
         boolean success = false;
         while(!success) {
@@ -46,8 +53,8 @@ class DataSource {
                 ++retryCounter;
                 System.out.println("Connecting to database server (attempt " + retryCounter + ")");
                 connection = DriverManager.getConnection(
-                        getConnectionURL(),
-                        DATABASE_USER, DATABASE_PASSWORD
+                        credentials.getConnectionURL(),
+                        credentials.getUser(), credentials.getPassword()
                 );
                 success = true;
             } catch (SQLException ex) {
@@ -76,21 +83,6 @@ class DataSource {
     //------
 
     /**
-     * Helper method for construction the database connection URL from default parameters
-     * @return The connection URL.
-     */
-    private String getConnectionURL() {
-        StringBuilder connectionURL = new StringBuilder();
-        connectionURL.append(DATABASE_PROTOCOL).append(':')
-            .append(DATABASE_VENDOR).append("://")
-            .append(DATABASE_HOST).append(':')
-            .append(DATABASE_PORT).append('/')
-            .append("?useSSL=false");
-
-        return connectionURL.toString();
-    }
-
-    /**
      * Checks if the correct database schema exists by querying the information schema.
      *
      * @return {@code true} if the database exists.
@@ -100,7 +92,7 @@ class DataSource {
         Statement statement = connection.createStatement();
         StringBuilder query = new StringBuilder();
         query.append("SELECT schema_name FROM information_schema.schemata WHERE schema_name = '")
-            .append(DATABASE_NAME).append("';");
+            .append(credentials.getDatabase()).append("';");
         ResultSet result = statement.executeQuery(query.toString());
         boolean answer = result.next();
         statement.close();
@@ -116,7 +108,7 @@ class DataSource {
         Statement statement = connection.createStatement();
         StringBuilder query = new StringBuilder();
         query.append("CREATE DATABASE ")
-            .append(DATABASE_NAME).append(";");
+            .append(credentials.getDatabase()).append(";");
         statement.executeUpdate(query.toString());
         statement.close();
     }
@@ -133,7 +125,7 @@ class DataSource {
         }
 
         //Set the default database.
-        connection.setCatalog(DATABASE_NAME);
+        connection.setCatalog(credentials.getDatabase());
 
         if (!bookTableExists()) {
             initialiseBookTable();
