@@ -1,0 +1,17 @@
+services:
+  database:
+    image: mysql:8.2.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: R00t+
+      MYSQL_DATABASE: ebookstore
+      MYSQL_USER: Librarian
+      MYSQL_PASSWORD: Applecart
+    container_name: database
+
+  app:
+    build: .
+    stdin_open: true
+    tty: true
+    container_name: bookstore-app
