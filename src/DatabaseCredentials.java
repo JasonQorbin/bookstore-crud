@@ -31,7 +31,7 @@ public class DatabaseCredentials {
                 .append(vendor).append("://")
                 .append(host).append(':')
                 .append(port).append('/')
-                .append("?useSSL=false");
+                .append("?useSSL=false&allowPublicKeyRetrieval=true");
 
         return connectionURL.toString();
     }

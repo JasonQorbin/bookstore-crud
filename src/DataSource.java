@@ -58,7 +58,9 @@ class DataSource {
                 );
                 success = true;
             } catch (SQLException ex) {
-                System.out.println("Connection failed. Retrying in 10 seconds...");
+                System.out.println("Connection failed. ");
+                System.out.println(ex.getMessage());
+                System.out.println("Retrying in 10 seconds...");
                 try {
                     Thread.sleep(10 * 1000);
                 } catch (InterruptedException intEx) {
@@ -355,6 +357,8 @@ class DataSource {
     /**
      * Inserts the initial data into the books table.
      *
+     * The insertion query is built here again so that a PreparedStatement can be used in a batch execution.
+     *
      * @throws SQLException If an error occurs with the database connection.
      */
     public void insertInitialData() throws SQLException {
@@ -364,15 +368,16 @@ class DataSource {
                 .append(COLUMN_AUTHOR).append(", ")
                 .append(COLUMN_QTY)
                 .append(") VALUES ( ?, ?, ? );");
-        System.out.println(query);
+
         PreparedStatement statement = connection.prepareStatement(query.toString());
         for (int index = 0; index < STARTING_TITLES.length; ++index) {
             statement.setString(1,STARTING_TITLES[index]);
             statement.setString(2,STARTING_AUTHORS[index]);
             statement.setInt(3,STARTING_QTY[index]);
-            statement.executeUpdate();
+            statement.addBatch();
             statement.clearParameters();
         }
+        statement.executeBatch();
         statement.close();
     }
 
