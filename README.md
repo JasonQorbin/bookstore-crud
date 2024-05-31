@@ -7,7 +7,7 @@ Author and quantity.
 The project is built to connect to a MYSQL database but could easily be configured to use
 MariaDB also.
 
-This was a ootcamp exercise that I'm keeping to serve as a model for CRUD appps I want to make
+This was a bootcamp exercise that I'm keeping to serve as a model for CRUD appps I want to make
 in the future. I also hope this can serve as a nice instructionaal example to others.
 
 ## How to run the app
